@@ -1,7 +1,8 @@
 % Author: Damir Akchurin
-% Date: 1/1/22
+% Date: 11/1/22
 % Version history:
-% V1.0 - First working version of the software (1/2/22)
+% V1.0 - Damir Akchurin - First working version of the software (11/2/22)
+% V1.1 - Damir Akchurin - Fixed an issue with finding parallel elements and added plotting function (11/3/22)
 
 clc
 close all
@@ -22,6 +23,9 @@ ElemsInfo = [
 SysNodeI = 1;
 SysNodeJ = 5;
 
+%% Plot the system:
+PlotHybridSpringSystem(ElemsInfo, SysNodeI, SysNodeJ);
+
 %% Calculate system reliability index:
 % Store element information array to track the results:
 Counter = 1;
@@ -32,7 +36,7 @@ ElemsInfo(:, [2, 3]) = sort(ElemsInfo(:, [2, 3]), 2);
 
 while size(ElemsInfo, 1) ~= 1
     %% Check if any elements are in series:
-    % NOTE: 
+    % NOTE:
     % - If a node has two elements connected to it and if it is not a system node, then these
     % elements are in series and can be replaced with an equivalent element
     % - If a node has 2 elements connected to it and if it is a system node, then these elements are
@@ -49,7 +53,7 @@ while size(ElemsInfo, 1) ~= 1
         for i = 1:numel(SeriesNodes)
             % Make sure that the node is not a system node, beucase it might indicate that the node
             % might connect two elements in parallel
-            if i ~= SysNodeI || i ~= SysNodeJ 
+            if i ~= SysNodeI || i ~= SysNodeJ
                 % Identify two elements that are in series:
                 [SeriesElemsIndexR, SeriesElemsIndexC] = find(ElemsInfo(:, [2, 3]) == SeriesNodes(i));
 
@@ -70,7 +74,7 @@ while size(ElemsInfo, 1) ~= 1
             end
         end
     end
-    
+
     Counter = Counter + 1;
     ElemsInfoStore{Counter} = ElemsInfo;
 
@@ -78,46 +82,67 @@ while size(ElemsInfo, 1) ~= 1
     % NOTE: If combinations of element-containing node pairs can form other element-containing node
     % pairs, then the former node pairs, given that they contain more than one element, must contain
     % elements that are connected in parallel and can be replaced with an equivalent element.
+    % To simplify further comments, "element-containing node pairs" are refered to as "node pair".
 
-    % Identify element-containing node pairs:
-    [NodePairs, ~, GroupIndex] = unique(ElemsInfo(:, [2, 3]), 'Rows');
+    % Identify node pairs:
+    [OriginalNodePairs, ~, GroupIndex] = unique(ElemsInfo(:, [2, 3]), 'Rows');
+    NodePairs = OriginalNodePairs;
     NumElemsInEachNodePair = accumarray(GroupIndex, 1);
 
     % Identify node pairs that contain parallel elements which can be replaced with an equivalent
     % element:
-    NumNodePairs = size(NodePairs, 1);
-    BannedNodePairs = cell(NumNodePairs, 1);
-    for i = 1:NumNodePairs
-        % Extract a node pair:
-        CurrentNodePair = NodePairs(i, :);
+    NewNodePairsStore = true;
 
-        % Find compatible node pairs:
-        CompatibleNodePairsIndex = CurrentNodePair(2) == NodePairs(:, 1);
-        CompatibleNodePairs = NodePairs(CompatibleNodePairsIndex, :);
+    while ~isempty(NewNodePairsStore)
+        % Preallocate:
+        NumNodePairs = size(NodePairs, 1);
+        AlreadyExistingNodePairsStore = cell(NumNodePairs, 1);
+        NewNodePairsStore = cell(NumNodePairs, 1);
 
-        % Find nodes pairs that can be formed from combining the current node pair and node pairs
-        % that are compatible with it:
-        if ~isempty(CompatibleNodePairs)
-            NumCompatibleNodePairs = size(CompatibleNodePairs, 1);
-            NewlyFormedNodePairs = zeros(NumCompatibleNodePairs, 2);
+        for i = 1:NumNodePairs
+            % Extract a node pair:
+            CurrentNodePair = NodePairs(i, :);
 
-            for j = 1:NumCompatibleNodePairs
-                NewlyFormedNodePairs(j, [1, 2]) = [CurrentNodePair(1), CompatibleNodePairs(j, 2)];
+            % Find compatible node pairs:
+            CompatibleNodePairsIndex = CurrentNodePair(2) == NodePairs(:, 1);
+            CompatibleNodePairs = NodePairs(CompatibleNodePairsIndex, :);
+
+            % Find nodes pairs that can be formed from combining the current node pair and node pairs
+            % that are compatible with it:
+            if ~isempty(CompatibleNodePairs)
+                NumCompatibleNodePairs = size(CompatibleNodePairs, 1);
+                FormedNodePairs = zeros(NumCompatibleNodePairs, 2);
+
+                for j = 1:NumCompatibleNodePairs
+                    FormedNodePairs(j, [1, 2]) = [CurrentNodePair(1), CompatibleNodePairs(j, 2)];
+                end
+            else
+                FormedNodePairs = double.empty(0, 2);
             end
-        else
-            NewlyFormedNodePairs = [];
+
+            % Categorize formed node pairs into new ones and the ones that already exist:
+            AlreadyExistingNodePairs = intersect(NodePairs, FormedNodePairs, 'Rows');
+            NewNodePairs = FormedNodePairs(~ismember(FormedNodePairs, AlreadyExistingNodePairs, 'Rows'), :);
+
+            % Store new node pairs and the ones that already exist for the record:
+            AlreadyExistingNodePairsStore{i} = AlreadyExistingNodePairs;
+            NewNodePairsStore{i} = NewNodePairs;
         end
-        
-        % Add newly formed node pairs to a ban list
-        BannedNodePairs{i} = NewlyFormedNodePairs;
+
+        % Add new node pairs to the existing element-containing node pairs:
+        NewNodePairsStore = cell2mat(NewNodePairsStore);
+        NumNewNodePairs = size(NewNodePairsStore, 1);
+        NodePairs(1:end + NumNewNodePairs, :) = [NodePairs; NewNodePairsStore];
     end
     
-    BannedNodePairs = cell2mat(BannedNodePairs);
-    if ~isempty(BannedNodePairs)
-        ParallelIndex = and(~ismember(NodePairs, BannedNodePairs, 'Rows'), NumElemsInEachNodePair > 1);
-        NodePairsWithParallelElems = NodePairs(ParallelIndex, :);
-    else 
-        NodePairsWithParallelElems = NodePairs;
+    % Identify node pairs that contain parallel elements which can be replaced with an equivalent
+    % element:
+    AlreadyExistingNodePairsStore = cell2mat(AlreadyExistingNodePairsStore);
+    if ~isempty(AlreadyExistingNodePairsStore)
+        ParallelIndex = and(~ismember(OriginalNodePairs, AlreadyExistingNodePairsStore, 'Rows'), NumElemsInEachNodePair > 1);
+        NodePairsWithParallelElems = OriginalNodePairs(ParallelIndex, :);
+    else
+        NodePairsWithParallelElems = OriginalNodePairs;
     end
 
     if ~isempty(NodePairsWithParallelElems)
@@ -143,4 +168,3 @@ while size(ElemsInfo, 1) ~= 1
     Counter = Counter + 1;
     ElemsInfoStore{Counter} = ElemsInfo;
 end
-
