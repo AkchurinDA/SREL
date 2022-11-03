@@ -1,7 +1,7 @@
 % Author: Damir Akchurin
 % Date: 11/3/22
 
-function [] = PlotHybridSpringSystem(ElemsInfo, SysNodeI, SysNodeJ)
+function PlotHybridSpringSystem(ElemsInfo, SysNodeI, SysNodeJ)
 % Create a graph using nodes of each element:
 G = graph(ElemsInfo(:, 2), ElemsInfo(:, 3));
 
@@ -15,10 +15,9 @@ SysNodeColor = 'R';
 
 % Plot the graph:
 H = plot(G, 'NodeColor', NodeColor, 'MarkerSize', NodeSize, 'EdgeColor', ElementColor, 'LineWidth', ElementWidth,...
-    'Layout', 'SubSpace', 'EdgeLabel', ElemsInfo(:, 1));
+    'Layout', 'SubSpace', 'EdgeLabel', strcat(num2str(ElemsInfo(:, 1)), repmat(", $\beta$ = ", size(ElemsInfo, 1), 1), num2str(ElemsInfo(:, 4))), 'Interpreter', 'Latex');
 
 % Highlight the system nodes:
-
 highlight(H, [SysNodeI, SysNodeJ], 'Marker', SysNodeMarker, 'NodeColor', SysNodeColor)
 
 % Add additional info:

@@ -23,9 +23,6 @@ ElemsInfo = [
 SysNodeI = 1;
 SysNodeJ = 5;
 
-%% Plot the system:
-PlotHybridSpringSystem(ElemsInfo, SysNodeI, SysNodeJ);
-
 %% Calculate system reliability index:
 % Store element information array to track the results:
 Counter = 1;
@@ -84,87 +81,98 @@ while size(ElemsInfo, 1) ~= 1
     % elements that are connected in parallel and can be replaced with an equivalent element.
     % To simplify further comments, "element-containing node pairs" are refered to as "node pair".
 
-    % Identify node pairs:
-    [OriginalNodePairs, ~, GroupIndex] = unique(ElemsInfo(:, [2, 3]), 'Rows');
-    NodePairs = OriginalNodePairs;
-    NumElemsInEachNodePair = accumarray(GroupIndex, 1);
+    if size(ElemsInfo) ~= 1
+        % Identify node pairs:
+        [OriginalNodePairs, ~, GroupIndex] = unique(ElemsInfo(:, [2, 3]), 'Rows');
+        NodePairs = OriginalNodePairs;
+        NumElemsInEachNodePair = accumarray(GroupIndex, 1);
 
-    % Identify node pairs that contain parallel elements which can be replaced with an equivalent
-    % element:
-    NewNodePairsStore = true;
+        % Identify node pairs that contain parallel elements which can be replaced with an equivalent
+        % element:
+        NewNodePairsStore = true;
 
-    while ~isempty(NewNodePairsStore)
-        % Preallocate:
-        NumNodePairs = size(NodePairs, 1);
-        AlreadyExistingNodePairsStore = cell(NumNodePairs, 1);
-        NewNodePairsStore = cell(NumNodePairs, 1);
+        while ~isempty(NewNodePairsStore)
+            % Preallocate:
+            NumNodePairs = size(NodePairs, 1);
+            AlreadyExistingNodePairsStore = cell(NumNodePairs, 1);
+            NewNodePairsStore = cell(NumNodePairs, 1);
 
-        for i = 1:NumNodePairs
-            % Extract a node pair:
-            CurrentNodePair = NodePairs(i, :);
+            for i = 1:NumNodePairs
+                % Extract a node pair:
+                CurrentNodePair = NodePairs(i, :);
 
-            % Find compatible node pairs:
-            CompatibleNodePairsIndex = CurrentNodePair(2) == NodePairs(:, 1);
-            CompatibleNodePairs = NodePairs(CompatibleNodePairsIndex, :);
+                % Find compatible node pairs:
+                CompatibleNodePairsIndex = CurrentNodePair(2) == NodePairs(:, 1);
+                CompatibleNodePairs = NodePairs(CompatibleNodePairsIndex, :);
 
-            % Find nodes pairs that can be formed from combining the current node pair and node pairs
-            % that are compatible with it:
-            if ~isempty(CompatibleNodePairs)
-                NumCompatibleNodePairs = size(CompatibleNodePairs, 1);
-                FormedNodePairs = zeros(NumCompatibleNodePairs, 2);
+                % Find nodes pairs that can be formed from combining the current node pair and node pairs
+                % that are compatible with it:
+                if ~isempty(CompatibleNodePairs)
+                    NumCompatibleNodePairs = size(CompatibleNodePairs, 1);
+                    FormedNodePairs = zeros(NumCompatibleNodePairs, 2);
 
-                for j = 1:NumCompatibleNodePairs
-                    FormedNodePairs(j, [1, 2]) = [CurrentNodePair(1), CompatibleNodePairs(j, 2)];
+                    for j = 1:NumCompatibleNodePairs
+                        FormedNodePairs(j, [1, 2]) = [CurrentNodePair(1), CompatibleNodePairs(j, 2)];
+                    end
+                else
+                    FormedNodePairs = double.empty(0, 2);
                 end
-            else
-                FormedNodePairs = double.empty(0, 2);
+
+                % Categorize formed node pairs into new ones and the ones that already exist:
+                AlreadyExistingNodePairs = intersect(NodePairs, FormedNodePairs, 'Rows');
+                NewNodePairs = FormedNodePairs(~ismember(FormedNodePairs, AlreadyExistingNodePairs, 'Rows'), :);
+
+                % Store new node pairs and the ones that already exist for the record:
+                AlreadyExistingNodePairsStore{i} = AlreadyExistingNodePairs;
+                NewNodePairsStore{i} = NewNodePairs;
             end
 
-            % Categorize formed node pairs into new ones and the ones that already exist:
-            AlreadyExistingNodePairs = intersect(NodePairs, FormedNodePairs, 'Rows');
-            NewNodePairs = FormedNodePairs(~ismember(FormedNodePairs, AlreadyExistingNodePairs, 'Rows'), :);
-
-            % Store new node pairs and the ones that already exist for the record:
-            AlreadyExistingNodePairsStore{i} = AlreadyExistingNodePairs;
-            NewNodePairsStore{i} = NewNodePairs;
+            % Add new node pairs to the existing element-containing node pairs:
+            NewNodePairsStore = cell2mat(NewNodePairsStore);
+            NumNewNodePairs = size(NewNodePairsStore, 1);
+            NodePairs(1:end + NumNewNodePairs, :) = [NodePairs; NewNodePairsStore];
         end
 
-        % Add new node pairs to the existing element-containing node pairs:
-        NewNodePairsStore = cell2mat(NewNodePairsStore);
-        NumNewNodePairs = size(NewNodePairsStore, 1);
-        NodePairs(1:end + NumNewNodePairs, :) = [NodePairs; NewNodePairsStore];
-    end
-    
-    % Identify node pairs that contain parallel elements which can be replaced with an equivalent
-    % element:
-    AlreadyExistingNodePairsStore = cell2mat(AlreadyExistingNodePairsStore);
-    if ~isempty(AlreadyExistingNodePairsStore)
-        ParallelIndex = and(~ismember(OriginalNodePairs, AlreadyExistingNodePairsStore, 'Rows'), NumElemsInEachNodePair > 1);
-        NodePairsWithParallelElems = OriginalNodePairs(ParallelIndex, :);
-    else
-        NodePairsWithParallelElems = OriginalNodePairs;
-    end
-
-    if ~isempty(NodePairsWithParallelElems)
-        for i = 1:size(NodePairsWithParallelElems, 1)
-            % Identify elements that are in parallel:
-            ParallelElemsIndex = ismember(ElemsInfo(:, [2, 3]), NodePairsWithParallelElems(i, :), 'Rows');
-
-            % Calculate equivalent probability of failure:
-            FailureProbability = cdf("Normal", -ElemsInfo(ParallelElemsIndex, 4), 0, 1);
-            EqFailureProbability = prod(FailureProbability);
-
-            % Calculate equivalent reliability index:
-            EqReliabilityIndex = -icdf("Normal", EqFailureProbability, 0, 1);
-
-            % Update the element information array:
-            ParallelElems = ElemsInfo(ParallelElemsIndex, 1);
-            NewElemNum = ParallelElems(1);
-            ElemsInfo(ParallelElemsIndex, :) = [];
-            ElemsInfo(size(ElemsInfo, 1) + 1, :) = [NewElemNum, NodePairsWithParallelElems(i, :), EqReliabilityIndex];
+        % Identify node pairs that contain parallel elements which can be replaced with an equivalent
+        % element:
+        AlreadyExistingNodePairsStore = cell2mat(AlreadyExistingNodePairsStore);
+        if ~isempty(AlreadyExistingNodePairsStore)
+            ParallelIndex = and(~ismember(OriginalNodePairs, AlreadyExistingNodePairsStore, 'Rows'), NumElemsInEachNodePair > 1);
+            NodePairsWithParallelElems = OriginalNodePairs(ParallelIndex, :);
+        else
+            NodePairsWithParallelElems = OriginalNodePairs;
         end
-    end
 
-    Counter = Counter + 1;
-    ElemsInfoStore{Counter} = ElemsInfo;
+        if ~isempty(NodePairsWithParallelElems)
+            for i = 1:size(NodePairsWithParallelElems, 1)
+                % Identify elements that are in parallel:
+                ParallelElemsIndex = ismember(ElemsInfo(:, [2, 3]), NodePairsWithParallelElems(i, :), 'Rows');
+
+                % Calculate equivalent probability of failure:
+                FailureProbability = cdf("Normal", -ElemsInfo(ParallelElemsIndex, 4), 0, 1);
+                EqFailureProbability = prod(FailureProbability);
+
+                % Calculate equivalent reliability index:
+                EqReliabilityIndex = -icdf("Normal", EqFailureProbability, 0, 1);
+
+                % Update the element information array:
+                ParallelElems = ElemsInfo(ParallelElemsIndex, 1);
+                NewElemNum = ParallelElems(1);
+                ElemsInfo(ParallelElemsIndex, :) = [];
+                ElemsInfo(size(ElemsInfo, 1) + 1, :) = [NewElemNum, NodePairsWithParallelElems(i, :), EqReliabilityIndex];
+            end
+        end
+
+        Counter = Counter + 1;
+        ElemsInfoStore{Counter} = ElemsInfo;
+    end
+end
+
+%% Plot the system:
+figure
+tiledlayout flow
+for i = 1:numel(ElemsInfoStore)
+    nexttile
+    PlotHybridSpringSystem(ElemsInfoStore{i}, SysNodeI, SysNodeJ);
+    title("Iteration " + (i - 1))
 end
