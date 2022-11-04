@@ -19,17 +19,28 @@ ElemsInfo = [
     6, 1, 3, 2.5;
     7, 3, 5, 2.5];
 
+% Template for purely series system:
+% NElems = 10;
+% ElemsInfo = [
+%     (1:NElems)', (1:NElems)', (2:NElems + 1)', 2.5*ones(NElems, 1)];
+
+% Template for purely parallel system:
+% NElems = 10;
+% ElemsInfo = [
+%     (1:NElems)', 1*ones(NElems, 1), 2*ones(NElems, 1), 2.5*ones(NElems, 1)];
+
 %% Define system nodes:
 SysNodeI = 1;
 SysNodeJ = 5;
 
 %% Calculate system reliability index:
+% Sort node numbering to simplify further calculations:
+ElemsInfo(:, [2, 3]) = sort(ElemsInfo(:, [2, 3]), 2);
+ElemsInfo = sortrows(ElemsInfo, [2, 3]);
+
 % Store element information array to track the results:
 Counter = 1;
 ElemsInfoStore{Counter} = ElemsInfo;
-
-% Sort node numbering to simplify further calculations:
-ElemsInfo(:, [2, 3]) = sort(ElemsInfo(:, [2, 3]), 2);
 
 while size(ElemsInfo, 1) ~= 1
     %% Check if any elements are in series:

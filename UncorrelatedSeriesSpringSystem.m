@@ -8,12 +8,13 @@ close all
 clear variables
 
 % Define the number of springs:
-NSprings = 10;
+NSprings = 100;
 
 % Define the properties of the springs:
-ReliabilityIndexMin = 2.5;
-ReliabilityIndexMax = 4.0;
-ReliabilityIndices = ReliabilityIndexMin + (ReliabilityIndexMax - ReliabilityIndexMin)*rand(NSprings, 1);
+% ReliabilityIndexMin = 2.5;
+% ReliabilityIndexMax = 4.0;
+% ReliabilityIndices = ReliabilityIndexMin + (ReliabilityIndexMax - ReliabilityIndexMin)*rand(NSprings, 1);
+ReliabilityIndices = 2.5*ones(NSprings, 1);
 FailureProbabilies = normcdf(-ReliabilityIndices); % Assuming that the strength distribution is normal for each spring
 
 % Calculate the system failure probability:
