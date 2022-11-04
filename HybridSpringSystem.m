@@ -36,7 +36,6 @@ SysNodeJ = 5;
 %% Calculate system reliability index:
 % Sort node numbering to simplify further calculations:
 ElemsInfo(:, [2, 3]) = sort(ElemsInfo(:, [2, 3]), 2);
-ElemsInfo = sortrows(ElemsInfo, [2, 3]);
 
 % Store element information array to track the results:
 Counter = 1;
@@ -83,11 +82,14 @@ while size(ElemsInfo, 1) ~= 1
         end
     end
 
+    % Store element information array to track the results:
+    ElemsInfo = sortrows(ElemsInfo, 1);
     Counter = Counter + 1;
     ElemsInfoStore{Counter} = ElemsInfo;
 
     %% Check if any elements are in parallel:
-    % NOTE: If combinations of element-containing node pairs can form other element-containing node
+    % NOTE: 
+    % - If combinations of element-containing node pairs can form other element-containing node
     % pairs, then the former node pairs, given that they contain more than one element, must contain
     % elements that are connected in parallel and can be replaced with an equivalent element.
     % To simplify further comments, "element-containing node pairs" are refered to as "node pair".
@@ -173,7 +175,9 @@ while size(ElemsInfo, 1) ~= 1
                 ElemsInfo(size(ElemsInfo, 1) + 1, :) = [NewElemNum, NodePairsWithParallelElems(i, :), EqReliabilityIndex];
             end
         end
-
+        
+        % Store element information array to track the results:
+        ElemsInfo = sortrows(ElemsInfo, 1);
         Counter = Counter + 1;
         ElemsInfoStore{Counter} = ElemsInfo;
     end

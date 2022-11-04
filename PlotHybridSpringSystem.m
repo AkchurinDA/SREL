@@ -27,6 +27,7 @@ end
 G.Nodes.Name = NodeLabelsCell;
 
 % Define edge labels:
+ElemsInfo = sortrows(ElemsInfo, [2, 3]);
 EgdeLabels = strcat(num2str(ElemsInfo(:, 1)), repmat(", $\beta$ = ", size(ElemsInfo, 1), 1), num2str(ElemsInfo(:, 4)));
 
 % Plot the graph:
